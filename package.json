@@ -21,7 +21,11 @@
     "@motiadev/plugin-logs": "^0.17.6-beta.187",
     "@motiadev/plugin-observability": "^0.17.6-beta.187",
     "@motiadev/plugin-states": "^0.17.6-beta.187",
+    "fluent-ffmpeg": "^2.1.3",
     "motia": "^0.17.6-beta.187",
+    "openai": "^6.13.0",
+    "resend": "^6.6.0",
+    "ytdl-core": "^4.11.5",
     "zod": "^4.1.12"
   },
   "devDependencies": {
