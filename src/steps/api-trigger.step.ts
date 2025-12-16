@@ -17,7 +17,7 @@ export const config: ApiRouteConfig = {
 export const handler: Handlers['TriggerContentCreation'] = async (req, { emit, logger }) => {
     const { youtubeUrl, userEmail } = req.body;
 
-    logger.info('ContentForge triggered', { youtubeUrl, userEmail });
+    logger.info('🎯 ContentForge triggered', { youtubeUrl, userEmail });
 
     await emit({
         topic: 'content.requested',

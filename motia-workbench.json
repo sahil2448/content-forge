@@ -20,10 +20,6 @@
         "x": 263,
         "y": 144
       },
-      "src/steps/process-video.step.ts": {
-        "x": -716,
-        "y": 62
-      },
       "src/steps/process-content.step.ts": {
         "x": 261,
         "y": 344
@@ -37,12 +33,12 @@
         "y": 534
       },
       "src/steps/api-trigger.step.ts": {
-        "x": -168,
-        "y": 337
+        "x": -420,
+        "y": 431
       },
-      "src/.motia/compiled/steps/publish-content.step.js": {
-        "x": 263,
-        "y": 227
+      "src/.motia/compiled/steps/api-trigger.step.js": {
+        "x": 0,
+        "y": 302
       }
     }
   }

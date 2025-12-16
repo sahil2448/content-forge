@@ -27,6 +27,7 @@
     "motia": "^0.17.6-beta.187",
     "openai": "^6.13.0",
     "resend": "^6.6.0",
+    "youtube-transcript": "^1.2.1",
     "ytdl-core": "^4.11.5",
     "zod": "^4.1.12"
   },
