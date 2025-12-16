@@ -12,5 +12,38 @@
         "sourceHandlePosition": "right"
       }
     }
+  },
+  {
+    "id": "content-forge",
+    "config": {
+      "src/steps/publish-content.step.ts": {
+        "x": 263,
+        "y": 144
+      },
+      "src/steps/process-video.step.ts": {
+        "x": -716,
+        "y": 62
+      },
+      "src/steps/process-content.step.ts": {
+        "x": 261,
+        "y": 344
+      },
+      "src/steps/handle-approval.step.ts": {
+        "x": -174,
+        "y": 152
+      },
+      "src/steps/approval.step.ts": {
+        "x": 461,
+        "y": 534
+      },
+      "src/steps/api-trigger.step.ts": {
+        "x": -168,
+        "y": 337
+      },
+      "src/.motia/compiled/steps/publish-content.step.js": {
+        "x": 263,
+        "y": 227
+      }
+    }
   }
 ]
