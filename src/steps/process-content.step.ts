@@ -27,7 +27,7 @@ export const config: EventConfig = {
 };
 
 export const handler: Handlers['ProcessContent'] = async (event: any, { emit, logger, state }: any) => {
-    const { youtubeUrl, userEmail, requestId } = event.data;
+    const { youtubeUrl, userEmail, requestId } = event;
 
     try {
         logger.info('📥 Downloading video...', { youtubeUrl });
