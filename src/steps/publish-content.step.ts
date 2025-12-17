@@ -10,10 +10,7 @@ export const config: EventConfig = {
     subscribes: ['content.publish'],
     input: z.object({
         requestId: z.string(),
-        userEmail: z.string(),
-        blogPost: z.string(),
-        tweet: z.string(),
-        linkedinPost: z.string(),
+        userEmail: z.string()
     }),
     emits: [],
     flows: ['content-forge'],
@@ -22,150 +19,104 @@ export const config: EventConfig = {
 export const handler: Handlers['PublishContent'] = async (event, { logger, state }) => {
     const { requestId, userEmail } = event;
 
-    logger.info('Loading approved content from state...', { requestId });
+    const existing = (await state.get('content', requestId)) as
+        | {
+            blogPost?: string;
+            tweet?: string;
+            linkedinPost?: string;
+            youtubeUrl?: string;
+            [key: string]: any;
+        }
+        | null;
 
-    const content = await state.get('content', requestId) as {
-        blogPost: string;
-        tweet: string;
-        linkedinPost: string;
-        [key: string]: any;
-    } | null;
+    if (!existing) throw new Error(`Content not found for requestId=${requestId}`);
 
-    if (!content) {
-        logger.error('❌ Content not found in state', { requestId });
-        throw new Error('Content not found or expired');
+    const blogPost = String(existing.blogPost ?? '');
+    const tweet = String(existing.tweet ?? '');
+    const linkedinPost = String(existing.linkedinPost ?? '');
+
+    if (!blogPost || !tweet || !linkedinPost) {
+        throw new Error('Generated content missing in state (blogPost/tweet/linkedinPost)');
     }
 
-    const { blogPost, tweet, linkedinPost } = content;
-
-    logger.info('📤 Publishing content to platforms...', { requestId });
-
-    try {
-        // Mock publishing results (in production: integrate Dev.to API, Twitter API, LinkedIn API)
-        const publishResults = {
-            blog: {
-                platform: 'Dev.to',
-                url: `https://dev.to/contentforge/article-${requestId}`,
-                published: true,
-                publishedAt: new Date().toISOString(),
-            },
-            tweet: {
-                platform: 'Twitter',
-                url: `https://twitter.com/contentforge/status/${requestId}`,
-                published: true,
-                publishedAt: new Date().toISOString(),
-            },
-            linkedin: {
-                platform: 'LinkedIn',
-                url: `https://linkedin.com/feed/update/urn:li:share:${requestId}`,
-                published: true,
-                publishedAt: new Date().toISOString(),
-            },
-        };
-
-        // Update state with publish results
-        await state.set('content', requestId, {
-            ...content,
-            status: 'published',
+    // Print full content in terminal
+    logger.info('📝 ==================== BLOG POST (FULL) ====================');
+    logger.info('\n' + blogPost + '\n');
+    logger.info('🐦 ==================== TWEET (FULL) ====================');
+    logger.info('\n' + tweet + '\n');
+    logger.info('💼 ==================== LINKEDIN POST (FULL) ====================');
+    logger.info('\n' + linkedinPost + '\n');
+    // Mock publish URLs
+    const publishResults = {
+        blog: {
+            platform: 'Dev.to',
+            url: `https://dev.to/contentforge/article-${requestId}`,
+            published: true,
             publishedAt: new Date().toISOString(),
-            results: publishResults,
-        });
+        },
+        tweet: {
+            platform: 'Twitter',
+            url: `https://twitter.com/contentforge/status/${requestId}`,
+            published: true,
+            publishedAt: new Date().toISOString(),
+        },
+        linkedin: {
+            platform: 'LinkedIn',
+            url: `https://linkedin.com/feed/update/urn:li:share:${requestId}`,
+            published: true,
+            publishedAt: new Date().toISOString(),
+        },
+    };
 
-        logger.info('✅ Content published successfully!', { requestId, publishResults });
+    await state.set('content', requestId, {
+        ...existing,
+        status: 'published',
+        publishedAt: new Date().toISOString(),
+        results: publishResults,
+    });
 
-        // Send success email with all links
-        await sendSuccessEmail(userEmail, requestId, publishResults, {
-            blogPost,
-            tweet,
-            linkedinPost,
-        });
-
-        logger.info('📧 Success email sent to user', { requestId, userEmail });
-
-    } catch (error: any) {
-        logger.error('❌ Publication failed', { error: error.message, requestId });
-
-        await state.set('content', requestId, {
-            ...content,
-            status: 'publish_failed',
-            error: error.message,
-            failedAt: new Date().toISOString(),
-        });
-
-        throw error;
-    }
-};
-
-// Send success email with published links
-async function sendSuccessEmail(
-    email: string,
-    requestId: string,
-    results: any,
-    content: { blogPost: string; tweet: string; linkedinPost: string }
-) {
     await resend.emails.send({
         from: 'ContentForge <onboarding@resend.dev>',
-        to: email,
+        to: userEmail,
         subject: '🎉 Your Content is Live!',
         html: `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ContentForge - Published Successfully!</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-        <h1 style="color: white; margin: 0;">🎉 Success!</h1>
-        <p style="color: #f0f0f0; margin: 10px 0 0 0;">Your content has been published</p>
-    </div>
-    
-    <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-        <h2 style="color: #4CAF50;">📝 Your Content is Now Live</h2>
-        <p>Great news! Your AI-generated content has been successfully published to all platforms.</p>
-        
-        <div style="background: white; padding: 20px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #667eea;">📚 Blog Post</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Published on ${results.blog.platform}</p>
-            <a href="${results.blog.url}" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                View Blog Post →
-            </a>
-        </div>
-        
-        <div style="background: white; padding: 20px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #1DA1F2;">🐦 Tweet</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Published on ${results.tweet.platform}</p>
-            <a href="${results.tweet.url}" style="background: #1DA1F2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                View Tweet →
-            </a>
-        </div>
-        
-        <div style="background: white; padding: 20px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #0077B5;">💼 LinkedIn Post</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Published on ${results.linkedin.platform}</p>
-            <a href="${results.linkedin.url}" style="background: #0077B5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                View LinkedIn Post →
-            </a>
-        </div>
-        
-        <div style="background: #e8f5e9; border-left: 4px solid #4CAF50; padding: 15px; margin-top: 30px; border-radius: 5px;">
-            <p style="margin: 0; color: #2e7d32;">
-                <strong>✨ Pro Tip:</strong> Track engagement on each platform and see what resonates best with your audience!
-            </p>
-        </div>
-        
-        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
-            <p style="color: #999; font-size: 12px;">Request ID: <code>${requestId}</code></p>
-        </div>
-    </div>
-    
-    <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
-        <p>Powered by ContentForge | Built with Motia</p>
-        <p>Want to create more content? Just send another video URL!</p>
-    </div>
-</body>
-</html>
-        `,
+      <div style="font-family: Arial, sans-serif; line-height:1.6;">
+        <h2>Published successfully</h2>
+        <p>Request ID: <code>${requestId}</code></p>
+
+        <h3>Links</h3>
+        <ul>
+          <li>Blog: <a href="${publishResults.blog.url}">${publishResults.blog.url}</a></li>
+          <li>Tweet: <a href="${publishResults.tweet.url}">${publishResults.tweet.url}</a></li>
+          <li>LinkedIn: <a href="${publishResults.linkedin.url}">${publishResults.linkedin.url}</a></li>
+        </ul>
+
+        <h3>Content</h3>
+        <h4>Blog</h4>
+        <pre style="white-space:pre-wrap;">${escapeHtml(blogPost)}</pre>
+        <h4>Tweet</h4>
+        <pre style="white-space:pre-wrap;">${escapeHtml(tweet)}</pre>
+        <h4>LinkedIn</h4>
+        <pre style="white-space:pre-wrap;">${escapeHtml(linkedinPost)}</pre>
+
+        <p>Original video: <a href="${existing.youtubeUrl ?? '#'}">${existing.youtubeUrl ?? 'N/A'}</a></p>
+      </div>
+    `,
+    });
+
+    logger.info('✅ PublishContent done', { requestId, userEmail });
+};
+
+function escapeHtml(s: string) {
+    return s.replace(/[&<>"']/g, (ch) => {
+        switch (ch) {
+            case '&': return '&amp;';
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '"': return '&quot;';
+            case "'": return '&#039;';
+            default: return ch;
+        }
     });
 }
+

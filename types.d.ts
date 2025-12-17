@@ -12,11 +12,11 @@ declare module 'motia' {
   }
 
   interface Handlers {
-    'PublishContent': EventHandler<{ requestId: string; userEmail: string; blogPost: string; tweet: string; linkedinPost: string }, never>
-    'ProcessContent': EventHandler<never, { topic: 'content.generated'; data: { requestId: string; userEmail: string; blogPost: string; tweet: string; linkedinPost: string } }>
-    'HandleApproval': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'content.publish'; data: { requestId: string; userEmail: string; blogPost: string; tweet: string; linkedinPost: string } }>
+    'PublishContent': EventHandler<{ requestId: string; userEmail: string }, never>
+    'ProcessContent': EventHandler<{ requestId: string; userEmail: string; youtubeUrl: string }, { topic: 'content.generated'; data: { requestId: string; userEmail: string; blogPost: string; tweet: string; linkedinPost: string } }>
+    'HandleApproval': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'content.publish'; data: { requestId: string; userEmail: string } }>
     'WaitForApproval': EventHandler<{ requestId: string; userEmail: string; blogPost: string; tweet: string; linkedinPost: string }, never>
-    'TriggerContentCreation': ApiRouteHandler<{ youtubeUrl: string; userEmail: string }, unknown, { topic: 'content.requested'; data: never }>
+    'TriggerContentCreation': ApiRouteHandler<{ youtubeUrl: string; userEmail: string }, unknown, { topic: 'content.requested'; data: { requestId: string; userEmail: string; youtubeUrl: string } }>
   }
     
 }

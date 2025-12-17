@@ -22,23 +22,23 @@
       },
       "src/steps/process-content.step.ts": {
         "x": 261,
-        "y": 344
+        "y": 151
       },
       "src/steps/handle-approval.step.ts": {
         "x": -174,
         "y": 152
       },
       "src/steps/approval.step.ts": {
-        "x": 461,
-        "y": 534
+        "x": 559,
+        "y": 380
       },
       "src/steps/api-trigger.step.ts": {
-        "x": -420,
-        "y": 431
+        "x": -151,
+        "y": 363
       },
-      "src/.motia/compiled/steps/api-trigger.step.js": {
-        "x": 0,
-        "y": 302
+      "src/.motia/compiled/steps/publish-content.step.js": {
+        "x": 263,
+        "y": 83
       }
     }
   }

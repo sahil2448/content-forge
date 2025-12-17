@@ -7,6 +7,7 @@
     "dev": "motia dev",
     "start": "motia start",
     "generate-types": "motia generate-types",
+    "lint": "eslint . --ext .ts,.js",
     "build": "motia build",
     "clean": "rm -rf dist node_modules python_modules .motia .mermaid"
   },
@@ -29,7 +30,7 @@
     "resend": "^6.6.0",
     "youtube-transcript": "^1.2.1",
     "ytdl-core": "^4.11.5",
-    "zod": "^4.1.12"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@motiadev/workbench": "^0.17.6-beta.187",
