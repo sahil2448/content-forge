@@ -1,3 +1,4 @@
+// filename: steps/process-content.step.ts
 import { z } from 'zod';
 import type { EventConfig, Handlers } from 'motia';
 import { fetchYouTubeTranscript } from '../../src/transcript';

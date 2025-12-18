@@ -1,3 +1,4 @@
+// filename: steps/publish-content.step.ts
 import { z } from 'zod';
 import type { EventConfig, Handlers } from 'motia';
 import { Resend } from 'resend';
