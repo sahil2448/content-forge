@@ -19,8 +19,6 @@ const QuerySchema = z.object({
     action: z.enum(['approve', 'reject']),
 });
 
-// IMPORTANT: keep content.publish minimal to avoid schema fights.
-// PublishContent will read the generated content from state.
 const ContentPublishSchema = z.object({
     requestId: z.string().min(1),
     userEmail: z.string().min(1),
@@ -33,7 +31,7 @@ type ContentState = {
     blogPost?: string;
     tweet?: string;
     linkedinPost?: string;
-    status: string; // 'pending_approval' | 'approved' | 'rejected' | 'published' | ...
+    status: string;
     expiresAt?: string;
     [key: string]: any;
 };

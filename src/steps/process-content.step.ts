@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { EventConfig, Handlers } from 'motia';
+import { fetchYouTubeTranscript } from '../../src/transcript';
 
 export const config: EventConfig = {
     name: 'ProcessContent',
@@ -26,22 +27,18 @@ const ContentGeneratedSchema = z.object({
 export const handler: Handlers['ProcessContent'] = async (event, { logger, state, emit }) => {
     const { requestId, userEmail, youtubeUrl } = event;
 
-    logger.info('🧠 Generating content via OpenRouter...', { requestId });
+    logger.info('Generating content via OpenRouter...', { requestId });
 
-    const transcript = 'this video is about ....lot many things like...bla.bla.bla';
-    //   await fetchYouTubeTranscript(youtubeUrl).catch(() => '');
-    if (!transcript) logger.warn('No transcript found (continuing with URL-only prompt)', { requestId });
-
-    const ai = await generateWithOpenRouter({
-        youtubeUrl,
-        transcript,
+    const transcript = await fetchYouTubeTranscript(youtubeUrl, { logger }).catch((e) => {
+        logger.warn('Failed to fetch transcript (continuing with URL-only prompt)', { requestId, error: String(e) });
+        return '';
     });
 
+    const ai = await generateWithOpenRouter({ youtubeUrl, transcript: transcript || undefined });
     const blogPost = ai.blogPost;
     const tweet = ai.tweet;
     const linkedinPost = ai.linkedinPost;
 
-    // Store everything in state for later steps (approval + publish)
     await state.set('content', requestId, {
         requestId,
         userEmail,
@@ -55,7 +52,6 @@ export const handler: Handlers['ProcessContent'] = async (event, { logger, state
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     });
 
-    // Emit payload required by WaitForApproval step (so it doesn't crash on undefined.substring)
     const payload = ContentGeneratedSchema.parse({
         requestId,
         userEmail,
@@ -70,7 +66,7 @@ export const handler: Handlers['ProcessContent'] = async (event, { logger, state
         data: payload,
     } as any);
 
-    logger.info('✅ content.generated emitted', { requestId });
+    logger.info('content.generated emitted', { requestId });
 };
 
 async function generateWithOpenRouter(input: { youtubeUrl: string; transcript?: string }) {
@@ -85,9 +81,9 @@ async function generateWithOpenRouter(input: { youtubeUrl: string; transcript?: 
         input.transcript ? `Transcript:\n${input.transcript}` : 'Transcript: (not available)',
         '',
         'Write:',
-        '- blogPost: 600-900 words, clear headings, actionable.',
-        '- tweet: <= 280 chars, include 2-4 hashtags.',
-        '- linkedinPost: 1200-2000 chars, professional tone, 3-6 bullet points, CTA at end.',
+        '- blogPost: 100-200 words, clear headings, actionable....and ENDED at the last',
+        '- tweet: <= 20 chars, include No any hashtags.....and ENDED at the last',
+        '- linkedinPost: <= 300 chars, professional tone, 3-6 bullet points, CTA at end.....and ENDED at the last',
         '',
         'Output JSON only.',
     ].join('\n');
@@ -97,7 +93,6 @@ async function generateWithOpenRouter(input: { youtubeUrl: string; transcript?: 
         headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
-            // Optional, but nice for OpenRouter rankings/visibility:
             'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'http://localhost:3000',
             'X-Title': process.env.OPENROUTER_APP_NAME || 'ContentForge',
         },
@@ -125,15 +120,12 @@ async function generateWithOpenRouter(input: { youtubeUrl: string; transcript?: 
         throw new Error('OpenRouter returned empty response');
     }
 
-    // Parse strict JSON (model was instructed to return JSON only)
     const parsed = safeJsonParse(content);
 
     function safeJsonParse(raw: string) {
-        // 1) If wrapped in ``````, extract inside
         const fence = raw.match(/``````/i);
         const candidate = (fence?.[1] ?? raw).trim();
 
-        // 2) If there’s extra text, grab the first {...} block
         const firstBrace = candidate.indexOf('{');
         const lastBrace = candidate.lastIndexOf('}');
         const jsonText =
@@ -145,11 +137,9 @@ async function generateWithOpenRouter(input: { youtubeUrl: string; transcript?: 
     }
 
     const blogPost = String(parsed.blogPost ?? '').trim();
-    console.log("blogPost:", parsed.blogPost);
+    console.log("Generated Blog Post:", blogPost);
     const tweet = String(parsed.tweet ?? '').trim();
-    console.log("tweet:", parsed.tweet);
     const linkedinPost = String(parsed.linkedinPost ?? '').trim();
-    console.log("linkedinPost:", parsed.linkedinPost);
 
     if (!blogPost || !tweet || !linkedinPost) {
         throw new Error('OpenRouter JSON missing required keys');
@@ -158,16 +148,6 @@ async function generateWithOpenRouter(input: { youtubeUrl: string; transcript?: 
     return { blogPost, tweet, linkedinPost };
 }
 
-// Optional transcript fetch. Install: npm i youtube-transcript
-async function fetchYouTubeTranscript(youtubeUrl: string): Promise<string> {
-    const videoId = extractVideoId(youtubeUrl);
-    if (!videoId) return '';
-
-    const mod: any = await import('youtube-transcript');
-    const items = await mod.YoutubeTranscript.fetchTranscript(videoId);
-    const text = (items || []).map((x: any) => x.text).join(' ');
-    return text.trim();
-}
 
 function extractVideoId(url: string): string | null {
     try {

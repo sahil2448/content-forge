@@ -38,15 +38,6 @@ export const handler: Handlers['PublishContent'] = async (event, { logger, state
     if (!blogPost || !tweet || !linkedinPost) {
         throw new Error('Generated content missing in state (blogPost/tweet/linkedinPost)');
     }
-
-    // Print full content in terminal
-    logger.info('📝 ==================== BLOG POST (FULL) ====================');
-    logger.info('\n' + blogPost + '\n');
-    logger.info('🐦 ==================== TWEET (FULL) ====================');
-    logger.info('\n' + tweet + '\n');
-    logger.info('💼 ==================== LINKEDIN POST (FULL) ====================');
-    logger.info('\n' + linkedinPost + '\n');
-    // Mock publish URLs
     const publishResults = {
         blog: {
             platform: 'Dev.to',
@@ -104,7 +95,7 @@ export const handler: Handlers['PublishContent'] = async (event, { logger, state
     `,
     });
 
-    logger.info('✅ PublishContent done', { requestId, userEmail });
+    logger.info('PublishContent done', { requestId, userEmail });
 };
 
 function escapeHtml(s: string) {

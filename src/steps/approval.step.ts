@@ -9,53 +9,53 @@ const ResendApiKey = process.env.RESEND_API_KEY || '';
 const resend = ResendApiKey ? new Resend(ResendApiKey) : null;
 
 export const ApprovalInputSchema = z.object({
-    requestId: z.string(),
-    userEmail: z.string().regex(emailRegex, 'Invalid email'),
-    blogPost: z.string(),
-    tweet: z.string(),
-    linkedinPost: z.string(),
+  requestId: z.string(),
+  userEmail: z.string().regex(emailRegex, 'Invalid email'),
+  blogPost: z.string(),
+  tweet: z.string(),
+  linkedinPost: z.string(),
 });
 
 export const config: EventConfig = {
-    name: 'WaitForApproval',
-    type: 'event',
-    subscribes: ['content.generated'],
-    input: ApprovalInputSchema,
-    emits: [],
-    flows: ['content-forge'],
+  name: 'WaitForApproval',
+  type: 'event',
+  subscribes: ['content.generated'],
+  input: ApprovalInputSchema,
+  emits: [],
+  flows: ['content-forge'],
 };
 
 export const handler: Handlers['WaitForApproval'] = async (event, { logger, state }) => {
-    const { requestId, userEmail, blogPost, tweet, linkedinPost } = ApprovalInputSchema.parse(event);
+  const { requestId, userEmail, blogPost, tweet, linkedinPost } = ApprovalInputSchema.parse(event);
 
-    logger.info('📧 Preparing approval email', { requestId, userEmail });
+  logger.info('📧 Preparing approval email', { requestId, userEmail });
 
-    await state.set('content', requestId, {
-        requestId,
-        userEmail,
-        blogPost,
-        tweet,
-        linkedinPost,
-        status: 'pending_approval',
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    });
+  await state.set('content', requestId, {
+    requestId,
+    userEmail,
+    blogPost,
+    tweet,
+    linkedinPost,
+    status: 'pending_approval',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  });
 
-    const base = process.env.BASE_URL || 'http://localhost:3000';
-    const approveUrl = `${base}/api/approve?id=${encodeURIComponent(requestId)}&action=approve`;
-    const rejectUrl = `${base}/api/approve?id=${encodeURIComponent(requestId)}&action=reject`;
+  const base = process.env.BASE_URL || 'http://localhost:3000';
+  const approveUrl = `${base}/api/approve?id=${encodeURIComponent(requestId)}&action=approve`;
+  const rejectUrl = `${base}/api/approve?id=${encodeURIComponent(requestId)}&action=reject`;
 
-    if (!resend) {
-        logger.warn('RESEND_API_KEY missing — skipping email send. Provide RESEND_API_KEY to enable emails.');
-        return;
-    }
+  if (!resend) {
+    logger.warn('RESEND_API_KEY missing — skipping email send. Provide RESEND_API_KEY to enable emails.');
+    return;
+  }
 
-    try {
-        await resend.emails.send({
-            from: 'ContentForge <onboarding@resend.dev>',
-            to: userEmail,
-            subject: '✅ Your AI-Generated Content is Ready!',
-            html: `
+  try {
+    await resend.emails.send({
+      from: 'ContentForge <onboarding@resend.dev>',
+      to: userEmail,
+      subject: '✅ Your AI-Generated Content is Ready!',
+      html: `
         <!doctype html><html><head><meta charset="utf-8"/></head><body style="font-family:Arial, sans-serif; line-height:1.6; max-width:600px; margin:0 auto; padding:20px;">
           <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); padding:30px; border-radius:10px 10px 0 0; text-align:center;">
             <h1 style="color:#fff;margin:0;">🎬 ContentForge</h1>
@@ -85,23 +85,23 @@ export const handler: Handlers['WaitForApproval'] = async (event, { logger, stat
           <div style="text-align:center;padding:20px;color:#999;font-size:12px;">Powered by ContentForge | Built with Motia</div>
         </body></html>
       `,
-        });
+    });
 
-        logger.info('✅ Approval email sent', { requestId, userEmail });
-    } catch (err: any) {
-        logger.error('❌ Failed sending approval email', { requestId, userEmail, error: err?.message ?? err });
-    }
+    logger.info('✅ Approval email sent', { requestId, userEmail });
+  } catch (err: any) {
+    logger.error('❌ Failed sending approval email', { requestId, userEmail, error: err?.message ?? err });
+  }
 };
 
 function escapeHtml(s: string) {
-    return String(s ?? '').replace(/[&<>"']/g, (ch) => {
-        switch (ch) {
-            case '&': return '&amp;';
-            case '<': return '&lt;';
-            case '>': return '&gt;';
-            case '"': return '&quot;';
-            case "'": return '&#039;';
-            default: return ch;
-        }
-    });
+  return String(s ?? '').replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#039;';
+      default: return ch;
+    }
+  });
 }

@@ -16,6 +16,7 @@
   ],
   "dependencies": {
     "@deepgram/sdk": "^4.11.2",
+    "@egoist/youtube-transcript-plus": "^1.1.2",
     "@google/generative-ai": "^0.24.1",
     "@motiadev/adapter-bullmq-events": "^0.17.6-beta.187",
     "@motiadev/core": "^0.17.6-beta.187",
@@ -28,7 +29,9 @@
     "motia": "^0.17.6-beta.187",
     "openai": "^6.13.0",
     "resend": "^6.6.0",
+    "undici": "^7.16.0",
     "youtube-transcript": "^1.2.1",
+    "youtube-transcript-plus": "^1.1.1",
     "ytdl-core": "^4.11.5",
     "zod": "^4.2.1"
   },
