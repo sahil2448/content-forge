@@ -2,6 +2,7 @@
 import { z } from "zod";
 import type { EventConfig, Handlers } from "motia";
 import { Resend } from "resend";
+import { pushStatus } from "../streaming";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
@@ -43,7 +44,7 @@ function cleanHandle(s: string) {
         .replace(/\s+/g, "");
 }
 
-export const handler: Handlers["PublishContent"] = async (event, { logger, state }) => {
+export const handler: Handlers["PublishContent"] = async (event, { logger, state, streams }) => {
     const { requestId, userEmail, handles } = config.input.parse(event);
 
     const existing = (await state.get("content", requestId)) as ContentState | null;
@@ -92,6 +93,8 @@ export const handler: Handlers["PublishContent"] = async (event, { logger, state
         handles: handles ?? existing.handles,
         results: publishResults,
     });
+
+    await pushStatus(streams, requestId, "published", "Published successfully.");
 
     await resend.emails.send({
         from: "ContentForge <onboarding@resend.dev>",

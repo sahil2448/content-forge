@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,7 @@ type ContentState = {
     blogPost?: string;
     tweet?: string;
     linkedinPost?: string;
-    status: string; // generated | pending_approval | approved | rejected | publishing | published
+    status: string;
     results?: {
         blog?: { url?: string };
         tweet?: { url?: string };
@@ -45,7 +47,12 @@ function statusBadge(status?: string) {
     if (s === "rejected") return <Badge variant="destructive">Rejected</Badge>;
     if (s === "pending_approval") return <Badge variant="secondary">Pending approval</Badge>;
     if (s === "generated") return <Badge variant="secondary">Generated</Badge>;
-    return <Badge variant="secondary">{status || "Unknown"}</Badge>;
+    if (s === "expired") return <Badge variant="destructive">Expired</Badge>;
+    return <Badge variant="secondary">{status || "Queued"}</Badge>;
+}
+
+function isFinal(status?: string) {
+    return status === "published" || status === "rejected" || status === "expired";
 }
 
 async function copyToClipboard(text: string, label: string) {
@@ -54,42 +61,106 @@ async function copyToClipboard(text: string, label: string) {
 }
 
 export default function RequestPage() {
+    const router = useRouter();
     const params = useParams<{ id: string }>();
     const requestId = params.id;
 
+
     const [data, setData] = React.useState<ContentState | null>(null);
-    const [loading, setLoading] = React.useState(true);
-    const [error, setError] = React.useState<string | null>(null);
+
+    const [initialLoading, setInitialLoading] = React.useState(true);
+    const [backgroundFetching, setBackgroundFetching] = React.useState(false);
+
+    const [fatalError, setFatalError] = React.useState<string | null>(null);
+    const [consecutiveErrors, setConsecutiveErrors] = React.useState(0);
 
     const [handles, setHandles] = React.useState({ devto: "", x: "", linkedin: "" });
+    const pollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const inFlightRef = React.useRef(false);
+    const [manualRefreshing, setManualRefreshing] = React.useState(false);
 
-    const canSendEmail = data?.status === "generated";
-    const canPublish = data?.status === "approved";
 
-    async function refresh() {
+    const status = data?.status;
+    const canSendEmail = status === "generated";
+    const canPublish = status === "approved";
+
+    const hasGeneratedContent = Boolean(
+        data?.transcript?.trim() || data?.blogPost?.trim() || data?.tweet?.trim() || data?.linkedinPost?.trim()
+    );
+
+    const showSpinner = initialLoading || (!hasGeneratedContent && !fatalError);
+
+    async function fetchLatest(opts?: { silent?: boolean }) {
+        const silent = opts?.silent ?? true;
+        if (inFlightRef.current) return;
+
+        inFlightRef.current = true;
+        if (!silent) setManualRefreshing(true);
+
         try {
-            setError(null);
             const res = await fetch(`/api/content/${requestId}`, { cache: "no-store" });
-            const json = (await res.json().catch(() => ({}))) as ApiResp;
 
+
+            if (res.status === 404 && !data) return;
+
+            const json = (await res.json().catch(() => ({}))) as ApiResp;
             if (!res.ok || !json || json.success === false) {
                 throw new Error(json?.error || `Failed to fetch (${res.status})`);
             }
 
             setData(json.data);
+            setFatalError(null);
         } catch (e: any) {
-            setError(e?.message ?? "Failed to fetch");
+            setConsecutiveErrors((c) => c + 1);
+            if (consecutiveErrors >= 2) setFatalError(e?.message ?? "Failed to fetch");
         } finally {
-            setLoading(false);
+            setInitialLoading(false);
+            if (!silent) setManualRefreshing(false);
+            inFlightRef.current = false;
         }
     }
 
+    async function manualRefresh() {
+        await fetchLatest({ silent: false });
+    }
     React.useEffect(() => {
-        refresh();
-        const t = setInterval(refresh, 2000);
-        return () => clearInterval(t);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        let alive = true;
+
+        const schedule = (ms: number) => {
+            if (!alive) return;
+            if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+            pollTimerRef.current = setTimeout(tick, ms);
+        };
+
+        const tick = async () => {
+            if (!alive) return;
+
+            await fetchLatest({ silent: true });
+
+            const s = (data?.status || "").toLowerCase();
+            if (s === "published" || s === "rejected" || s === "expired") return;
+
+            if (!data || s === "queued" || s === "generate" || s === "transcript" || s === "publishing") {
+                schedule(900);
+                return;
+            }
+
+            if (s === "pending_approval") {
+                schedule(1200);
+                return;
+            }
+
+            schedule(1200);
+        };
+
+        tick();
+
+        return () => {
+            alive = false;
+            if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+        };
     }, [requestId]);
+
 
     async function sendApprovalEmail() {
         const p = fetch("/api/send-approval-email", {
@@ -103,13 +174,16 @@ export default function RequestPage() {
             success: async (res) => {
                 const j = await res.json().catch(() => ({}));
                 if (!res.ok || j?.success === false) throw new Error(j?.error || "Failed");
+
+                setData((d) => (d ? { ...d, status: "pending_approval" } : d));
+
                 return "Email sent. Waiting for approval…";
             },
             error: (e) => e?.message ?? "Failed to send email",
         });
 
         await p;
-        await refresh();
+        // await refreshOnce();
     }
 
     async function publishNow() {
@@ -133,133 +207,144 @@ export default function RequestPage() {
             success: async (res) => {
                 const j = await res.json().catch(() => ({}));
                 if (!res.ok || j?.success === false) throw new Error(j?.error || "Failed");
+
+                setData((d) => (d ? { ...d, status: "publishing" } : d));
+
                 return "Publish started.";
             },
             error: (e) => e?.message ?? "Publish failed",
         });
 
         await p;
-        await refresh();
+        // await refreshOnce();
     }
 
     return (
         <main className="min-h-screen bg-background">
             <div className="mx-auto max-w-5xl px-4 py-10 space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <div className="text-xl font-semibold">Request</div>
-                        <div className="text-sm text-muted-foreground">ID: {requestId}</div>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+
+                        <div>
+                            <div className="text-xl font-semibold">Request</div>
+                            <div className="text-sm text-muted-foreground">ID: {requestId}</div>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                         {statusBadge(data?.status)}
-                        <Button variant="outline" onClick={refresh}>
-                            Refresh
+                        <Button variant="outline" onClick={manualRefresh} disabled={manualRefreshing}>
+                            {manualRefreshing ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Refresh
+                                </>
+                            ) : (
+                                "Refresh"
+                            )}
                         </Button>
+
                     </div>
                 </div>
 
-                {error ? (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Couldn’t load status</CardTitle>
-                            <CardDescription className="text-red-500">{error}</CardDescription>
-                        </CardHeader>
-                    </Card>
-                ) : null}
-
                 <Card className="border-border/60">
                     <CardHeader>
-                        <CardTitle>Workflow</CardTitle>
-                        <CardDescription>Auto-refreshing every 2 seconds.</CardDescription>
+                        <CardTitle>Live workflow</CardTitle>
+                        <CardDescription>
+                            {showSpinner ? "Working…" : "Up to date."}{" "}
+                            {data?.status === "pending_approval" ? "Approve/Reject from email to unlock Publish." : null}
+                        </CardDescription>
                     </CardHeader>
 
                     <CardContent className="space-y-3">
-                        {loading ? (
-                            <div className="space-y-2">
-                                <Skeleton className="h-5 w-2/3" />
-                                <Skeleton className="h-5 w-1/2" />
-                                <Skeleton className="h-5 w-3/4" />
+                        {fatalError ? (
+                            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                                Couldn’t load status: {fatalError}
                             </div>
-                        ) : (
-                            <>
-                                <div className="text-sm">
-                                    <span className="text-muted-foreground">YouTube:</span>{" "}
-                                    {data?.youtubeUrl ? (
-                                        <a className="underline underline-offset-4" href={data.youtubeUrl} target="_blank" rel="noreferrer">
-                                            Open video
-                                        </a>
-                                    ) : (
-                                        <span className="text-muted-foreground">N/A</span>
-                                    )}
-                                </div>
+                        ) : null}
 
-                                <div className="text-sm">
-                                    <span className="text-muted-foreground">Email:</span> {data?.userEmail || "N/A"}
-                                </div>
+                        <div className="text-sm">
+                            <span className="text-muted-foreground">YouTube:</span>{" "}
+                            {data?.youtubeUrl ? (
+                                <a className="underline underline-offset-4" href={data.youtubeUrl} target="_blank" rel="noreferrer">
+                                    Open video
+                                </a>
+                            ) : (
+                                <span className="text-muted-foreground">Waiting…</span>
+                            )}
+                        </div>
 
+                        <div className="text-sm">
+                            <span className="text-muted-foreground">Email:</span> {data?.userEmail || <span className="text-muted-foreground">Waiting…</span>}
+                        </div>
+
+                        <Separator />
+
+                        {showSpinner ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Generating transcript + content… (auto-updating)
+                            </div>
+                        ) : null}
+
+                        {canSendEmail ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button onClick={sendApprovalEmail}>Send approval email</Button>
+                                <div className="text-xs text-muted-foreground">
+                                    Review here → send email → approve from inbox → publish unlocks.
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {data?.status === "pending_approval" ? (
+                            <div className="text-sm text-muted-foreground">Waiting for email approval…</div>
+                        ) : null}
+
+                        {canPublish ? (
+                            <div className="space-y-3">
                                 <Separator />
+                                <div className="text-sm font-medium">Where to publish</div>
 
-                                {canSendEmail ? (
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button onClick={sendApprovalEmail}>Send approval email</Button>
-                                        <div className="text-xs text-muted-foreground self-center">
-                                            Review content here → then approve from email → publishing unlocks.
-                                        </div>
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    <div className="space-y-2">
+                                        <Label>Dev.to username (optional)</Label>
+                                        <Input value={handles.devto} onChange={(e) => setHandles((h) => ({ ...h, devto: e.target.value }))} />
                                     </div>
-                                ) : null}
 
-                                {data?.status === "pending_approval" ? (
-                                    <div className="text-sm text-muted-foreground">
-                                        Waiting for email approval… (Approve/Reject from your inbox)
+                                    <div className="space-y-2">
+                                        <Label>X handle (optional)</Label>
+                                        <Input value={handles.x} onChange={(e) => setHandles((h) => ({ ...h, x: e.target.value }))} />
                                     </div>
-                                ) : null}
 
-                                {canPublish ? (
-                                    <div className="space-y-3">
-                                        <Separator />
-                                        <div className="text-sm font-medium">Where to publish</div>
-
-                                        <div className="grid gap-3 sm:grid-cols-3">
-                                            <div className="space-y-2">
-                                                <Label>Dev.to username (optional)</Label>
-                                                <Input value={handles.devto} onChange={(e) => setHandles((h) => ({ ...h, devto: e.target.value }))} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>X handle (optional)</Label>
-                                                <Input value={handles.x} onChange={(e) => setHandles((h) => ({ ...h, x: e.target.value }))} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>LinkedIn handle (optional)</Label>
-                                                <Input
-                                                    value={handles.linkedin}
-                                                    onChange={(e) => setHandles((h) => ({ ...h, linkedin: e.target.value }))}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <Button onClick={publishNow}>Publish</Button>
+                                    <div className="space-y-2">
+                                        <Label>LinkedIn handle (optional)</Label>
+                                        <Input value={handles.linkedin} onChange={(e) => setHandles((h) => ({ ...h, linkedin: e.target.value }))} />
                                     </div>
-                                ) : null}
+                                </div>
 
-                                {data?.status === "published" && data?.results ? (
-                                    <>
-                                        <Separator />
-                                        <div className="grid gap-2 sm:grid-cols-3">
-                                            <a className="text-sm underline underline-offset-4" target="_blank" rel="noreferrer" href={data.results.blog?.url || "#"}>
-                                                Blog link
-                                            </a>
-                                            <a className="text-sm underline underline-offset-4" target="_blank" rel="noreferrer" href={data.results.tweet?.url || "#"}>
-                                                Tweet link
-                                            </a>
-                                            <a className="text-sm underline underline-offset-4" target="_blank" rel="noreferrer" href={data.results.linkedin?.url || "#"}>
-                                                LinkedIn link
-                                            </a>
-                                        </div>
-                                    </>
-                                ) : null}
+                                <Button onClick={publishNow}>Publish</Button>
+                            </div>
+                        ) : null}
+
+                        {data?.status === "published" && data?.results ? (
+                            <>
+                                <Separator />
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                    <Link className="text-sm underline underline-offset-4" target="_blank" href={data.results.blog?.url || "#"}>
+                                        Blog link
+                                    </Link>
+                                    <Link className="text-sm underline underline-offset-4" target="_blank" href={data.results.tweet?.url || "#"}>
+                                        Tweet link
+                                    </Link>
+                                    <Link className="text-sm underline underline-offset-4" target="_blank" href={data.results.linkedin?.url || "#"}>
+                                        LinkedIn link
+                                    </Link>
+                                </div>
                             </>
-                        )}
+                        ) : null}
                     </CardContent>
                 </Card>
 
@@ -267,14 +352,16 @@ export default function RequestPage() {
                     <Card className="border-border/60">
                         <CardHeader>
                             <CardTitle>Transcript</CardTitle>
-                            <CardDescription>Used to generate the content.</CardDescription>
+                            <CardDescription>Auto-filled when ready.</CardDescription>
                         </CardHeader>
+
                         <CardContent>
-                            {loading ? (
+                            {showSpinner && !data?.transcript ? (
                                 <Skeleton className="h-40 w-full" />
                             ) : (
                                 <Textarea readOnly value={data?.transcript || ""} className="min-h-[240px]" placeholder="Transcript will appear here…" />
                             )}
+
                             <div className="mt-3 flex gap-2">
                                 <Button variant="outline" disabled={!data?.transcript} onClick={() => copyToClipboard(data?.transcript || "", "transcript")}>
                                     Copy
@@ -290,7 +377,7 @@ export default function RequestPage() {
                         </CardHeader>
 
                         <CardContent>
-                            {loading ? (
+                            {!hasGeneratedContent && showSpinner ? (
                                 <Skeleton className="h-40 w-full" />
                             ) : (
                                 <Tabs defaultValue="blog" className="w-full">
@@ -316,11 +403,7 @@ export default function RequestPage() {
 
                                     <TabsContent value="linkedin" className="space-y-2">
                                         <Textarea readOnly value={data?.linkedinPost || ""} className="min-h-[220px]" />
-                                        <Button
-                                            variant="outline"
-                                            disabled={!data?.linkedinPost}
-                                            onClick={() => copyToClipboard(data?.linkedinPost || "", "linkedin")}
-                                        >
+                                        <Button variant="outline" disabled={!data?.linkedinPost} onClick={() => copyToClipboard(data?.linkedinPost || "", "linkedin")}>
                                             Copy LinkedIn
                                         </Button>
                                     </TabsContent>

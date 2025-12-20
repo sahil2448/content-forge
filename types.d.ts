@@ -8,7 +8,7 @@ import { EventHandler, ApiRouteHandler, ApiResponse, MotiaStream, CronHandler } 
 
 declare module 'motia' {
   interface FlowContextStateStreams {
-    
+    'contentStatus': MotiaStream<{ requestId: string; stage: string; message: string; ts: string }>
   }
 
   interface Handlers {
@@ -18,6 +18,7 @@ declare module 'motia' {
     'ProcessContent': EventHandler<{ requestId: string; userEmail: string; youtubeUrl: string }, never>
     'HandleApproval': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'GetContent': ApiRouteHandler<Record<string, unknown>, unknown, never>
+    'CleanupExpiredContent': CronHandler<never>
     'WaitForApproval': EventHandler<{ requestId: string }, never>
     'TriggerContentCreation': ApiRouteHandler<{ youtubeUrl: string; userEmail: string }, unknown, { topic: 'content.requested'; data: { requestId: string; userEmail: string; youtubeUrl: string } }>
   }

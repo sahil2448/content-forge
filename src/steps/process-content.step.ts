@@ -2,6 +2,8 @@
 import { z } from 'zod';
 import type { EventConfig, Handlers } from 'motia';
 import { fetchYouTubeTranscript } from '../../src/transcript';
+import { pushStatus } from "../streaming";
+
 
 export const config: EventConfig = {
     name: 'ProcessContent',
@@ -25,22 +27,26 @@ const ContentGeneratedSchema = z.object({
     linkedinPost: z.string().min(1),
 });
 
-export const handler: Handlers['ProcessContent'] = async (event, { logger, state, emit }) => {
+export const handler: Handlers["ProcessContent"] = async (event, { logger, state, emit, streams }) => {
     const { requestId, userEmail, youtubeUrl } = event;
 
-    logger.info('Generating content via OpenRouter...', { requestId });
+    await pushStatus(streams, requestId, "transcript", "Fetching transcript…");
 
-    const transcript = await fetchYouTubeTranscript(youtubeUrl, { logger }).catch((e) => {
-        logger.warn('Failed to fetch transcript (continuing with URL-only prompt)', { requestId, error: String(e) });
-        return '';
+    const transcript = await fetchYouTubeTranscript(youtubeUrl, { logger }).catch(async (e) => {
+        await pushStatus(streams, requestId, "transcript", "Transcript unavailable. Continuing with URL-only…");
+        logger.warn("Failed to fetch transcript", { requestId, error: String(e) });
+        return "";
     });
 
+    await pushStatus(streams, requestId, "generate", "Generating content with AI…");
+
     const ai = await generateWithOpenRouter({ youtubeUrl, transcript: transcript || undefined });
+
     const blogPost = ai.blogPost;
     const tweet = ai.tweet;
     const linkedinPost = ai.linkedinPost;
 
-    await state.set('content', requestId, {
+    await state.set("content", requestId, {
         requestId,
         userEmail,
         youtubeUrl,
@@ -48,26 +54,14 @@ export const handler: Handlers['ProcessContent'] = async (event, { logger, state
         blogPost,
         tweet,
         linkedinPost,
-        status: 'generated',
+        status: "generated",
         createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     });
 
+    await pushStatus(streams, requestId, "generated", "Content generated. Review in UI and send approval email.");
 
-    const payload = ContentGeneratedSchema.parse({
-        requestId,
-        userEmail,
-        youtubeUrl,
-        blogPost,
-        tweet,
-        linkedinPost,
-    });
-
-    await emit({
-        topic: 'content.generated',
-        data: payload,
-    } as any);
-
+    await emit({ topic: "content.generated", data: { requestId, userEmail, youtubeUrl, blogPost, tweet, linkedinPost } } as any);
     logger.info('content.generated emitted', { requestId });
 };
 

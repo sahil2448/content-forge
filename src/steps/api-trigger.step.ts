@@ -1,6 +1,7 @@
 // filename: steps/api-trigger.step.ts
 import { z } from 'zod';
 import type { ApiRouteConfig, Handlers } from 'motia';
+import { pushStatus } from "../streaming";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const urlRegex = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
@@ -20,7 +21,7 @@ export const config: ApiRouteConfig = {
     flows: ['content-forge'],
 };
 
-export const handler: Handlers['TriggerContentCreation'] = async (req, { emit, logger }) => {
+export const handler: Handlers['TriggerContentCreation'] = async (req, { emit, logger, streams, state }) => {
     const parsed = BodySchema.safeParse(req.body ?? {});
     if (!parsed.success) {
         logger.warn('Invalid request body', { issues: parsed.error.format() });
@@ -33,19 +34,18 @@ export const handler: Handlers['TriggerContentCreation'] = async (req, { emit, l
     const { youtubeUrl, userEmail } = parsed.data;
     const requestId = Date.now().toString();
 
-    logger.info('🎯 ContentForge triggered', { youtubeUrl, userEmail, requestId });
+    await pushStatus(streams, requestId, "queued", "Request queued. Starting workflow…");
+
+    const index = ((await state.get("content_index", "all")) as string[] | null) ?? [];
+    if (!index.includes(requestId)) await state.set("content_index", "all", [...index, requestId]);
 
     await emit({
-        topic: 'content.requested',
+        topic: "content.requested",
         data: { requestId, youtubeUrl, userEmail },
     } as any);
 
     return {
         status: 202,
-        body: {
-            success: true,
-            message: 'Content generation started! Check your email for approval.',
-            requestId,
-        },
+        body: { success: true, message: "Content generation started!", requestId },
     };
 };

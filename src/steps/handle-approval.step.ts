@@ -1,6 +1,7 @@
 // filename: steps/handle-approval.step.ts
 import { z } from "zod";
 import type { ApiRouteConfig, Handlers } from "motia";
+import { pushStatus } from "../streaming";
 
 export const config: ApiRouteConfig = {
     name: "HandleApproval",
@@ -35,7 +36,7 @@ type ContentState = {
     [key: string]: any;
 };
 
-export const handler: Handlers["HandleApproval"] = async (req, { logger, state }) => {
+export const handler: Handlers["HandleApproval"] = async (req, { logger, state, streams }) => {
     const rawId = Array.isArray(req.queryParams.id) ? req.queryParams.id[0] : req.queryParams.id;
     const rawAction = Array.isArray(req.queryParams.action) ? req.queryParams.action[0] : req.queryParams.action;
 
@@ -108,6 +109,8 @@ export const handler: Handlers["HandleApproval"] = async (req, { logger, state }
         status: newStatus,
         decidedAt: new Date().toISOString(),
     });
+
+    await pushStatus(streams, id, newStatus, `Decision recorded: ${newStatus}`);
 
     logger.info("Decision recorded in state", { id, status: newStatus });
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { EventConfig, Handlers } from "motia";
 import { Resend } from "resend";
+import { pushStatus } from "../streaming";
 
 const ResendApiKey = process.env.RESEND_API_KEY || "";
 const resend = ResendApiKey ? new Resend(ResendApiKey) : null;
@@ -27,7 +28,7 @@ export const config: EventConfig = {
   flows: ["content-forge"],
 };
 
-export const handler: Handlers["WaitForApproval"] = async (event, { logger, state }) => {
+export const handler: Handlers["WaitForApproval"] = async (event, { logger, state, streams }) => {
   const { requestId } = Input.parse(event);
 
   const content = (await state.get("content", requestId)) as ContentState | null;
@@ -71,6 +72,8 @@ export const handler: Handlers["WaitForApproval"] = async (event, { logger, stat
       status: "pending_approval",
       emailSentAt: new Date().toISOString(),
     });
+    await pushStatus(streams, requestId, "pending_approval", "Approval email sent. Waiting for approval…");
+
 
     logger.info("Approval email sent", { requestId, userEmail: content.userEmail });
   } catch (err: any) {

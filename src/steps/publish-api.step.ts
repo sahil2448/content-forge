@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ApiRouteConfig, Handlers } from "motia";
+import { pushStatus } from "../streaming";
 
 const Body = z.object({
     requestId: z.string().min(1),
@@ -20,7 +21,7 @@ export const config: ApiRouteConfig = {
     flows: ["content-forge"],
 };
 
-export const handler: Handlers["TriggerPublish"] = async (req, { emit, state }) => {
+export const handler: Handlers["TriggerPublish"] = async (req, { emit, state, streams }) => {
     const parsed = Body.safeParse(req.body ?? {});
     if (!parsed.success) return { status: 400, body: { success: false, error: "Invalid body" } };
 
@@ -33,6 +34,8 @@ export const handler: Handlers["TriggerPublish"] = async (req, { emit, state }) 
     }
 
     await state.set("content", requestId, { ...content, status: "publishing", handles });
+    await pushStatus(streams, requestId, "publishing", "Publishing started…");
+
 
     await emit({
         topic: "content.publish",

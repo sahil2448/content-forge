@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Loader2 } from "lucide-react";
 
 type CreateResp =
   | { success: true; requestId: string; message?: string }
@@ -91,7 +92,6 @@ export default function HomePage() {
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="userEmail">Email</Label>
                   <Input
@@ -105,8 +105,16 @@ export default function HomePage() {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
-                  Start generation
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Starting…
+                    </>
+                  ) : (
+                    "Start generation"
+                  )}
                 </Button>
+
               </form>
             </CardContent>
           </Card>
