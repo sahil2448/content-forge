@@ -36,7 +36,9 @@ export default function HomePage() {
       loading: "Starting generation…",
       success: async (res) => {
         const data = (await res.json().catch(() => ({}))) as CreateResp;
-        if (!res.ok || !data || data.success === false) throw new Error(data?.error || "Failed");
+        if (!res.ok) throw new Error("Failed");
+        if (!data || data.success === false) throw new Error(data.error || "Failed");
+
         router.push(`/request/${data.requestId}`);
         return `Request started (ID: ${data.requestId})`;
       },

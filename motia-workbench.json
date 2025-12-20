@@ -16,9 +16,17 @@
   {
     "id": "content-forge",
     "config": {
+      "src/steps/send-approval-email.step.ts": {
+        "x": 23,
+        "y": 0
+      },
       "src/steps/publish-content.step.ts": {
         "x": 263,
         "y": 144
+      },
+      "src/steps/publish-api.step.ts": {
+        "x": 57,
+        "y": 151
       },
       "src/steps/process-content.step.ts": {
         "x": 261,
@@ -28,6 +36,14 @@
         "x": -174,
         "y": 152
       },
+      "src/steps/get-content.step.ts": {
+        "x": 68,
+        "y": 453
+      },
+      "src/steps/cleanup-expired.cron.step.ts": {
+        "x": 0,
+        "y": 604
+      },
       "src/steps/approval.step.ts": {
         "x": 559,
         "y": 380
@@ -35,10 +51,6 @@
       "src/steps/api-trigger.step.ts": {
         "x": -151,
         "y": 363
-      },
-      "src/.motia/compiled/steps/publish-content.step.js": {
-        "x": 263,
-        "y": 83
       }
     }
   }

@@ -100,24 +100,36 @@ export default function RequestPage() {
         try {
             const res = await fetch(`/api/content/${requestId}`, { cache: "no-store" });
 
-
             if (res.status === 404 && !data) return;
 
             const json = (await res.json().catch(() => ({}))) as ApiResp;
-            if (!res.ok || !json || json.success === false) {
-                throw new Error(json?.error || `Failed to fetch (${res.status})`);
+
+            if (!res.ok) {
+                if (json && typeof json === "object" && "success" in json && json.success === false) {
+                    throw new Error(json.error || `Failed to fetch (${res.status})`);
+                }
+                throw new Error(`Failed to fetch (${res.status})`);
+            }
+
+            if (!json || json.success === false) {
+                throw new Error(json?.error || "Failed to fetch");
             }
 
             setData(json.data);
             setFatalError(null);
+            setConsecutiveErrors(0);
         } catch (e: any) {
-            setConsecutiveErrors((c) => c + 1);
-            if (consecutiveErrors >= 2) setFatalError(e?.message ?? "Failed to fetch");
+            setConsecutiveErrors((prev) => {
+                const next = prev + 1;
+                if (next >= 3) setFatalError(e?.message ?? "Failed to fetch");
+                return next;
+            });
         } finally {
             setInitialLoading(false);
             if (!silent) setManualRefreshing(false);
             inFlightRef.current = false;
         }
+
     }
 
     async function manualRefresh() {
