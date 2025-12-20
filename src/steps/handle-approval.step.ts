@@ -1,28 +1,23 @@
 // filename: steps/handle-approval.step.ts
-import { z } from 'zod';
-import type { ApiRouteConfig, Handlers } from 'motia';
+import { z } from "zod";
+import type { ApiRouteConfig, Handlers } from "motia";
 
 export const config: ApiRouteConfig = {
-    name: 'HandleApproval',
-    type: 'api',
-    path: '/api/approve',
-    method: 'GET',
+    name: "HandleApproval",
+    type: "api",
+    path: "/api/approve",
+    method: "GET",
     queryParams: [
-        { name: 'id', description: 'Content request ID' },
-        { name: 'action', description: 'approve or reject' },
+        { name: "id", description: "Content request ID" },
+        { name: "action", description: "approve or reject" },
     ],
-    emits: ['content.publish'],
-    flows: ['content-forge'],
+    emits: [],
+    flows: ["content-forge"],
 };
 
 const QuerySchema = z.object({
     id: z.string().min(1),
-    action: z.enum(['approve', 'reject']),
-});
-
-const ContentPublishSchema = z.object({
-    requestId: z.string().min(1),
-    userEmail: z.string().min(1),
+    action: z.enum(["approve", "reject"]),
 });
 
 type ContentState = {
@@ -32,12 +27,15 @@ type ContentState = {
     blogPost?: string;
     tweet?: string;
     linkedinPost?: string;
+    transcript?: string;
     status: string;
+    createdAt?: string;
     expiresAt?: string;
+    decidedAt?: string;
     [key: string]: any;
 };
 
-export const handler: Handlers['HandleApproval'] = async (req, { emit, logger, state }) => {
+export const handler: Handlers["HandleApproval"] = async (req, { logger, state }) => {
     const rawId = Array.isArray(req.queryParams.id) ? req.queryParams.id[0] : req.queryParams.id;
     const rawAction = Array.isArray(req.queryParams.action) ? req.queryParams.action[0] : req.queryParams.action;
 
@@ -46,30 +44,30 @@ export const handler: Handlers['HandleApproval'] = async (req, { emit, logger, s
         return {
             status: 400,
             body: generateHtmlResponse(
-                'Invalid Request',
-                '⚠️',
-                '#ff9800',
-                'Missing or invalid query params.',
-                'Expected: /api/approve?id=...&action=approve|reject'
+                "Invalid Request",
+                "⚠️",
+                "#ff9800",
+                "Missing or invalid query params.",
+                "Expected: /api/approve?id=...&action=approve|reject"
             ),
-            headers: { 'Content-Type': 'text/html' },
+            headers: { "Content-Type": "text/html; charset=utf-8" },
         };
     }
 
     const { id, action } = parsed.data;
 
-    const content = (await state.get('content', id)) as ContentState | null;
+    const content = (await state.get("content", id)) as ContentState | null;
     if (!content) {
         return {
             status: 410,
             body: generateHtmlResponse(
-                'Link Expired',
-                '❌',
-                '#f44336',
-                'This approval link has expired or the content was not found.',
-                'Please request a new content generation.'
+                "Link Expired",
+                "❌",
+                "#f44336",
+                "This approval link has expired or the content was not found.",
+                "Please go back to the dashboard and request a new generation."
             ),
-            headers: { 'Content-Type': 'text/html' },
+            headers: { "Content-Type": "text/html; charset=utf-8" },
         };
     }
 
@@ -77,93 +75,78 @@ export const handler: Handlers['HandleApproval'] = async (req, { emit, logger, s
         return {
             status: 410,
             body: generateHtmlResponse(
-                'Link Expired',
-                '⏰',
-                '#f44336',
-                'This approval link has expired.',
-                'Please request a new content generation.'
+                "Link Expired",
+                "⏰",
+                "#f44336",
+                "This approval link has expired.",
+                "Please go back to the dashboard and request a new generation."
             ),
-            headers: { 'Content-Type': 'text/html' },
+            headers: { "Content-Type": "text/html; charset=utf-8" },
         };
     }
 
-    if (content.status !== 'pending_approval') {
+    // We allow approval only when the email step has been triggered.
+    // If you want to allow approval from 'generated' too, add it here.
+    if (content.status !== "pending_approval") {
         return {
             status: 400,
             body: generateHtmlResponse(
-                'Already Processed',
-                '⚠️',
-                '#ff9800',
+                "Already Processed",
+                "⚠️",
+                "#ff9800",
                 `This content has already been ${content.status}.`,
-                'You cannot approve or reject it again.'
+                "You cannot approve or reject it again."
             ),
-            headers: { 'Content-Type': 'text/html' },
+            headers: { "Content-Type": "text/html; charset=utf-8" },
         };
     }
 
-    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    const newStatus = action === "approve" ? "approved" : "rejected";
 
-    await state.set('content', id, {
+    await state.set("content", id, {
         ...content,
         status: newStatus,
         decidedAt: new Date().toISOString(),
     });
 
-    logger.info('✅ Decision recorded in state', { id, status: newStatus });
+    logger.info("Decision recorded in state", { id, status: newStatus });
 
-    if (action === 'approve') {
-        const payload = ContentPublishSchema.parse({
-            requestId: id,
-            userEmail: content.userEmail,
-        });
-
-        await emit({
-            topic: 'content.publish',
-            data: payload,
-        } as any);
-
+    if (action === "approve") {
         return {
             status: 200,
             body: generateHtmlResponse(
-                'Content Approved!',
-                '✅',
-                '#4CAF50',
-                'Your content has been approved and is being published.',
-                'You will receive a confirmation email shortly.'
+                "Approved!",
+                "✅",
+                "#16a34a",
+                "Approval recorded successfully.",
+                "Go back to the dashboard to add handles and publish."
             ),
-            headers: { 'Content-Type': 'text/html' },
+            headers: { "Content-Type": "text/html; charset=utf-8" },
         };
     }
 
     return {
         status: 200,
         body: generateHtmlResponse(
-            'Content Rejected',
-            '❌',
-            '#f44336',
-            'Your content has been rejected and will not be published.',
-            'You can generate new content anytime.'
+            "Rejected",
+            "❌",
+            "#dc2626",
+            "Rejection recorded successfully.",
+            "You can generate again from the dashboard."
         ),
-        headers: { 'Content-Type': 'text/html' },
+        headers: { "Content-Type": "text/html; charset=utf-8" },
     };
 };
 
-function generateHtmlResponse(
-    title: string,
-    emoji: string,
-    color: string,
-    message: string,
-    subMessage: string
-): string {
-    return `
-<!DOCTYPE html>
+function generateHtmlResponse(title: string, emoji: string, color: string, message: string, subMessage: string): string {
+    return `<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ContentForge - ${title}</title>
 </head>
-<body style="font-family: Arial, sans-serif; text-align:center; padding:40px;">
+<body style="font-family: Arial, sans-serif; text-align:center; padding:40px; background:#fafafa;">
   <div style="max-width:520px; margin:0 auto; background:#fff; border:1px solid #eee; padding:30px; border-radius:12px;">
     <div style="font-size:64px; margin-bottom:10px;">${emoji}</div>
     <div style="color:${color}; font-size:28px; font-weight:700; margin-bottom:10px;">${title}</div>
@@ -171,6 +154,5 @@ function generateHtmlResponse(
     <div style="font-size:13px; color:#777;">${subMessage}</div>
   </div>
 </body>
-</html>
-  `;
+</html>`;
 }

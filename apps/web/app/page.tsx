@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,15 +57,17 @@ export default function HomePage() {
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500" />
             <div>
               <div className="text-xl font-semibold">ContentForge</div>
-              <div className="text-sm text-muted-foreground">YouTube → Transcript → Posts → Approval → Publish</div>
+              <div className="text-sm text-muted-foreground">
+                YouTube → Transcript → Posts → Review → Email approval → Publish
+              </div>
             </div>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
             <Badge variant="secondary">Motia workflows</Badge>
             <Badge variant="secondary">OpenRouter generation</Badge>
+            <Badge variant="secondary">UI review</Badge>
             <Badge variant="secondary">Email approval</Badge>
-            <Badge variant="secondary">Publish simulation (MVP)</Badge>
           </div>
 
           <Separator className="mt-6" />
@@ -74,7 +77,7 @@ export default function HomePage() {
           <Card className="border-border/60">
             <CardHeader>
               <CardTitle>Generate content</CardTitle>
-              <CardDescription>Paste a YouTube link and get blog + tweet + LinkedIn post.</CardDescription>
+              <CardDescription>Paste a YouTube link and get the content in the dashboard.</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={onSubmit}>
@@ -110,19 +113,15 @@ export default function HomePage() {
 
           <Card className="border-border/60">
             <CardHeader>
-              <CardTitle>How it works</CardTitle>
-              <CardDescription>End-to-end workflow optimized for demo + real usage.</CardDescription>
+              <CardTitle>Flow</CardTitle>
+              <CardDescription>Optimized for demo + real users.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <div>1) Submit URL + email</div>
-              <div>2) Transcript is fetched</div>
-              <div>3) AI generates content</div>
-              <div>4) Approval email is sent</div>
-              <div>5) Approve → publish step runs</div>
-              <Separator />
-              <div className="text-xs">
-                Tip: Keep this tab open—your request page will auto-refresh status.
-              </div>
+              <div>2) Transcript + content generated</div>
+              <div>3) Review content in UI</div>
+              <div>4) Click “Send approval email”</div>
+              <div>5) Approve from email → publish unlocks in UI</div>
             </CardContent>
           </Card>
         </div>

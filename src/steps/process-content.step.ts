@@ -48,10 +48,11 @@ export const handler: Handlers['ProcessContent'] = async (event, { logger, state
         blogPost,
         tweet,
         linkedinPost,
-        status: 'pending_approval',
+        status: 'generated',
         createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     });
+
 
     const payload = ContentGeneratedSchema.parse({
         requestId,

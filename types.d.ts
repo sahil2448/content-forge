@@ -12,11 +12,13 @@ declare module 'motia' {
   }
 
   interface Handlers {
-    'PublishContent': EventHandler<{ requestId: string; userEmail: string }, never>
-    'ProcessContent': EventHandler<{ requestId: string; userEmail: string; youtubeUrl: string }, { topic: 'content.generated'; data: { requestId: string; userEmail: string; blogPost: string; tweet: string; linkedinPost: string } }>
-    'HandleApproval': ApiRouteHandler<Record<string, unknown>, unknown, { topic: 'content.publish'; data: { requestId: string; userEmail: string } }>
+    'SendApprovalEmail': ApiRouteHandler<{ requestId: string }, unknown, { topic: 'content.email_requested'; data: { requestId: string } }>
+    'PublishContent': EventHandler<{ requestId: string; userEmail: string; handles?: { devto?: string; x?: string; linkedin?: string } }, never>
+    'TriggerPublish': ApiRouteHandler<{ requestId: string; handles: { devto?: string; x?: string; linkedin?: string } }, unknown, { topic: 'content.publish'; data: { requestId: string; userEmail: string; handles?: { devto?: string; x?: string; linkedin?: string } } }>
+    'ProcessContent': EventHandler<{ requestId: string; userEmail: string; youtubeUrl: string }, never>
+    'HandleApproval': ApiRouteHandler<Record<string, unknown>, unknown, never>
     'GetContent': ApiRouteHandler<Record<string, unknown>, unknown, never>
-    'WaitForApproval': EventHandler<{ requestId: string; userEmail: string; blogPost: string; tweet: string; linkedinPost: string }, never>
+    'WaitForApproval': EventHandler<{ requestId: string }, never>
     'TriggerContentCreation': ApiRouteHandler<{ youtubeUrl: string; userEmail: string }, unknown, { topic: 'content.requested'; data: { requestId: string; userEmail: string; youtubeUrl: string } }>
   }
     
