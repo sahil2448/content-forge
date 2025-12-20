@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
-
+import { ReadMore } from "@/components/read-more";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -349,7 +349,7 @@ export default function RequestPage() {
                 </Card>
 
                 <div className="grid gap-6 lg:grid-cols-2">
-                    <Card className="border-border/60">
+                    <Card className="border-border/60 h-fit">
                         <CardHeader>
                             <CardTitle>Transcript</CardTitle>
                             <CardDescription>Auto-filled when ready.</CardDescription>
@@ -358,9 +358,12 @@ export default function RequestPage() {
                         <CardContent>
                             {showSpinner && !data?.transcript ? (
                                 <Skeleton className="h-40 w-full" />
+                            ) : data?.transcript ? (
+                                <ReadMore text={data.transcript} limit={1025} className="rounded-md border bg-background p-3" />
                             ) : (
-                                <Textarea readOnly value={data?.transcript || ""} className="min-h-[240px]" placeholder="Transcript will appear here…" />
+                                <div className="text-sm text-muted-foreground">Transcript will appear here…</div>
                             )}
+
 
                             <div className="mt-3 flex gap-2">
                                 <Button variant="outline" disabled={!data?.transcript} onClick={() => copyToClipboard(data?.transcript || "", "transcript")}>
