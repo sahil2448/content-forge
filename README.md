@@ -208,7 +208,7 @@ As a chemical engineering student transitioning to software development, this pr
 - **Email-Only Approval**: No in-app approval interface yet
 - **Publishing**: Uses a mock publish step; it doesn’t post to real social media yet(I focused more working on motia as expected from hackathon).
 
-## 🔮 Future Enhancements
+## Future Enhancements
 
 - Add user authentication and multi-user support
 - Implement in-app approval workflow (remove email dependency)
@@ -218,30 +218,4 @@ As a chemical engineering student transitioning to software development, this pr
 - Support for multiple languages
 - Analytics dashboard for content performance
 - Improve transcript reliability with alternative methods
-
-## 📂 Project Structure
-
-content-forge/
-├── apps/
-│ └── web/ # Next.js frontend
-├── src/
-│ ├── steps/ # Motia workflow steps
-│ │ ├── api-trigger.step.ts
-│ │ ├── process-content.step.ts
-│ │ ├── send-approval-email.step.ts
-│ │ ├── handle-approval.step.ts
-│ │ └── cleanup-expired.cron.step.ts
-│ ├── streaming.ts # Status streaming utilities
-│ └── transcript.ts # YouTube transcript fetching
-├── .env # Environment variables
-├── package.json
-└── README.md
-
-## 🙏 Acknowledgments
-
-- **Motia Team** - For the excellent event-driven framework
-- **OpenRouter** - For providing unified access to AI models
-- **YouTube Transcript Libraries** - youtube-transcript, youtube-transcript-plus
-- **Vercel** - For seamless Next.js deployment
-
 
