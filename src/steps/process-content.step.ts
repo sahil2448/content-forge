@@ -1,4 +1,3 @@
-// filename: steps/process-content.step.ts
 import { z } from "zod";
 import type { EventConfig, Handlers } from "motia";
 import { fetchYouTubeTranscript } from "../../src/transcript";
@@ -29,25 +28,23 @@ export const handler: Handlers["ProcessContent"] = async (
 ) => {
     const { requestId, userEmail, youtubeUrl } = event;
 
-    await pushStatus(streams, requestId, "transcript", "Fetching transcript…");
+    await pushStatus(streams, requestId, "transcript", "Transcribing audio…");
 
-    let transcript = "";
+    let transcriptRaw = "";
     try {
-        transcript = await fetchYouTubeTranscript(youtubeUrl, { logger });
+        transcriptRaw = await fetchYouTubeTranscript(youtubeUrl, { logger });
     } catch (e) {
-        logger.warn("ProcessContent transcript fetch failed", {
+        logger.warn("ProcessContent transcription failed", {
             requestId,
             error: String(e),
         });
-        await pushStatus(
-            streams,
-            requestId,
-            "transcript",
-            "Transcript blocked. Using video metadata fallback…"
-        );
     }
 
-    const meta = await fetchYouTubeOEmbed(youtubeUrl, logger).catch((e) => {
+    const transcriptForUi =
+        transcriptRaw?.trim() ||
+        "Transcript unavailable (transcription failed or returned empty).";
+
+    const meta = await fetchYouTubeOEmbed(youtubeUrl).catch((e) => {
         logger.warn("ProcessContent oEmbed fetch failed", {
             requestId,
             error: String(e),
@@ -55,19 +52,19 @@ export const handler: Handlers["ProcessContent"] = async (
         return null;
     });
 
-    if (!transcript && !meta?.title) {
+    if (!transcriptRaw?.trim() && !meta?.title) {
         await pushStatus(
             streams,
             requestId,
             "error",
-            "Cannot fetch transcript or metadata. Try again later."
+            "Cannot transcribe or fetch metadata. Try again later."
         );
 
         await state.set("content", requestId, {
             requestId,
             userEmail,
             youtubeUrl,
-            transcript: "",
+            transcript: transcriptForUi,
             blogPost: "",
             tweet: "",
             linkedinPost: "",
@@ -84,7 +81,7 @@ export const handler: Handlers["ProcessContent"] = async (
 
     const ai = await generateWithOpenRouter({
         youtubeUrl,
-        transcript: transcript || undefined,
+        transcript: transcriptRaw?.trim() ? transcriptRaw : undefined,
         title: meta?.title,
         channel: meta?.author_name,
     });
@@ -95,7 +92,7 @@ export const handler: Handlers["ProcessContent"] = async (
         requestId,
         userEmail,
         youtubeUrl,
-        transcript,
+        transcript: transcriptForUi,
         blogPost: validated.blogPost,
         tweet: validated.tweet,
         linkedinPost: validated.linkedinPost,
@@ -124,13 +121,13 @@ export const handler: Handlers["ProcessContent"] = async (
     } as const;
 
     await emit(payload as any);
-
-
     logger.info("content.generated emitted", { requestId });
 };
 
-
-async function fetchWithTimeout(url: string, init: RequestInit & { timeoutMs?: number } = {}) {
+async function fetchWithTimeout(
+    url: string,
+    init: RequestInit & { timeoutMs?: number } = {}
+) {
     const { timeoutMs = 15_000, ...rest } = init;
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -141,8 +138,10 @@ async function fetchWithTimeout(url: string, init: RequestInit & { timeoutMs?: n
     }
 }
 
-async function fetchYouTubeOEmbed(youtubeUrl: string, logger: any) {
-    const url = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(youtubeUrl)}`;
+async function fetchYouTubeOEmbed(youtubeUrl: string) {
+    const url = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(
+        youtubeUrl
+    )}`;
     const res = await fetchWithTimeout(url, { timeoutMs: 10_000 });
     if (!res.ok) throw new Error(`oEmbed ${res.status}`);
     const json = await res.json();
@@ -183,7 +182,7 @@ async function generateWithOpenRouter(input: {
         .join("\n");
 
     const referer = process.env.OPENROUTER_SITE_URL;
-    const title = process.env.OPENROUTER_APP_NAME || "ContentForge";
+    const appTitle = process.env.OPENROUTER_APP_NAME || "ContentForge";
 
     const payload = {
         model,
@@ -206,7 +205,7 @@ async function generateWithOpenRouter(input: {
                     Authorization: `Bearer ${apiKey}`,
                     "Content-Type": "application/json",
                     ...(referer ? { "HTTP-Referer": referer } : {}),
-                    ...(title ? { "X-Title": title } : {}),
+                    ...(appTitle ? { "X-Title": appTitle } : {}),
                 },
                 body: JSON.stringify(payload),
             });
@@ -216,14 +215,12 @@ async function generateWithOpenRouter(input: {
                 throw new Error(`OpenRouter error ${res.status}: ${text}`);
             }
 
-            // const json = await res.json();
             type OpenRouterResponse = {
                 choices?: Array<{ message?: { content?: string } }>;
             };
 
             const json: OpenRouterResponse = await res.json();
             const completionText = json?.choices?.[0]?.message?.content;
-
 
             if (typeof completionText !== "string" || !completionText.trim()) {
                 throw new Error("OpenRouter returned empty response");

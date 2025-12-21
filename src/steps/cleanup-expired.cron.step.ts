@@ -37,7 +37,6 @@ export const handler: Handlers["CleanupExpiredContent"] = async (_input, { state
             }
             continue;
         }
-
         keep.push(id);
     }
 
