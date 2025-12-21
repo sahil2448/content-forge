@@ -28,21 +28,30 @@ export const handler: Handlers["ProcessContent"] = async (
 ) => {
     const { requestId, userEmail, youtubeUrl } = event;
 
-    await pushStatus(streams, requestId, "transcript", "Transcribing audio…");
+    await pushStatus(streams, requestId, "transcript", "Fetching transcript…");
 
     let transcriptRaw = "";
     try {
         transcriptRaw = await fetchYouTubeTranscript(youtubeUrl, { logger });
     } catch (e) {
-        logger.warn("ProcessContent transcription failed", {
+        logger.warn("ProcessContent transcript fetch failed", {
             requestId,
             error: String(e),
         });
+
+        await pushStatus(
+            streams,
+            requestId,
+            "transcript",
+            "Transcript could not be generated for this video. Continuing to generate content…"
+        );
     }
 
-    const transcriptForUi =
-        transcriptRaw?.trim() ||
-        "Transcript unavailable (transcription failed or returned empty).";
+    const transcriptOk = transcriptRaw.trim().length > 0;
+
+    const transcriptForUi = transcriptOk
+        ? transcriptRaw.trim()
+        : "Transcript could not be generated for this video. The content below may still be generated successfully.";
 
     const meta = await fetchYouTubeOEmbed(youtubeUrl).catch((e) => {
         logger.warn("ProcessContent oEmbed fetch failed", {
@@ -52,12 +61,12 @@ export const handler: Handlers["ProcessContent"] = async (
         return null;
     });
 
-    if (!transcriptRaw?.trim() && !meta?.title) {
+    if (!transcriptOk && !meta?.title) {
         await pushStatus(
             streams,
             requestId,
             "error",
-            "Cannot transcribe or fetch metadata. Try again later."
+            "Cannot fetch transcript or video metadata right now. Please try again later."
         );
 
         await state.set("content", requestId, {
@@ -81,7 +90,7 @@ export const handler: Handlers["ProcessContent"] = async (
 
     const ai = await generateWithOpenRouter({
         youtubeUrl,
-        transcript: transcriptRaw?.trim() ? transcriptRaw : undefined,
+        transcript: transcriptOk ? transcriptRaw.trim() : undefined,
         title: meta?.title,
         channel: meta?.author_name,
     });
@@ -169,7 +178,9 @@ async function generateWithOpenRouter(input: {
         `YouTube URL: ${input.youtubeUrl}`,
         input.title ? `Video title: ${input.title}` : "",
         input.channel ? `Channel: ${input.channel}` : "",
-        input.transcript ? `Transcript:\n${input.transcript}` : "Transcript: (not available)",
+        input.transcript
+            ? `Transcript:\n${input.transcript}`
+            : "Transcript: (not available)",
         "",
         "Write:",
         "- blogPost: 150-250 words, 2 short headings, actionable, based on the transcript/context.",
@@ -198,17 +209,20 @@ async function generateWithOpenRouter(input: {
     let lastErr: any = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-            const res = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
-                method: "POST",
-                timeoutMs: 60_000,
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    "Content-Type": "application/json",
-                    ...(referer ? { "HTTP-Referer": referer } : {}),
-                    ...(appTitle ? { "X-Title": appTitle } : {}),
-                },
-                body: JSON.stringify(payload),
-            });
+            const res = await fetchWithTimeout(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {
+                    method: "POST",
+                    timeoutMs: 60_000,
+                    headers: {
+                        Authorization: `Bearer ${apiKey}`,
+                        "Content-Type": "application/json",
+                        ...(referer ? { "HTTP-Referer": referer } : {}),
+                        ...(appTitle ? { "X-Title": appTitle } : {}),
+                    },
+                    body: JSON.stringify(payload),
+                }
+            );
 
             if (!res.ok) {
                 const text = await res.text().catch(() => "");
